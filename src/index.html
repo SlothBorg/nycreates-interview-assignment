@@ -80,6 +80,23 @@
                 },
             ];
 
+            function populateDropdowns() {
+                ["brand", "storage"].forEach((element) => {
+                    const dropdownSet = new Set(
+                        inventory.map((item) => item[element]),
+                    );
+
+                    const dropdownSelect = document.getElementById(element);
+
+                    dropdownSet.forEach((value) => {
+                        const option = document.createElement("option");
+                        option.value = value;
+                        option.textContent = value;
+                        dropdownSelect.appendChild(option);
+                    });
+                });
+            }
+
             function populateBrandDropdown() {
                 const brandSet = new Set(inventory.map((item) => item.brand));
 
@@ -161,20 +178,19 @@
                     results.forEach((phone) => {
                         const row = document.createElement("tr");
                         row.innerHTML = `
-          <td>${phone.brand}</td>
-          <td>${phone.model}</td>
-          <td>${phone.storage}</td>
-          <td>${phone.color}</td>
-          <td>$${phone.price.toFixed(2)}</td>
-        `;
+              <td>${phone.brand}</td>
+              <td>${phone.model}</td>
+              <td>${phone.storage}</td>
+              <td>${phone.color}</td>
+              <td>$${phone.price.toFixed(2)}</td>
+            `;
                         tbody.appendChild(row);
                     });
                     document.getElementById("resultsTable").style.display =
                         results.length ? "table" : "none";
                 });
 
-            window.onload = populateBrandDropdown();
-            window.onload = populateStorageDropdown();
+            window.onload = populateDropdowns();
         </script>
     </body>
 </html>
