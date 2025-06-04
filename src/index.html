@@ -10,7 +10,9 @@
         <h1>Cellphone Inventory Search</h1>
         <form id="searchForm">
             <label for="brand">Brand:</label>
-            <input type="text" id="brand" name="brand" />
+            <select id="brand" name="brand">
+                <option value="">-- Any --</option>
+            </select>
 
             <label for="storage">Storage:</label>
             <select id="storage" name="storage">
@@ -77,6 +79,19 @@
                     price: 659.99,
                 },
             ];
+
+            function populateBrandDropdown() {
+                const brandSet = new Set(inventory.map((item) => item.brand));
+
+                const brandSelect = document.getElementById("brand");
+
+                brandSet.forEach((brand) => {
+                    const option = document.createElement("option");
+                    option.value = brand;
+                    option.textContent = brand;
+                    brandSelect.appendChild(option);
+                });
+            }
 
             function populateStorageDropdown() {
                 const storageSet = new Set(
@@ -158,7 +173,8 @@
                         results.length ? "table" : "none";
                 });
 
-            window.onload = populateStorageDropdown;
+            window.onload = populateBrandDropdown();
+            window.onload = populateStorageDropdown();
         </script>
     </body>
 </html>
