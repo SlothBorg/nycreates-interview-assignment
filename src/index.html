@@ -3,11 +3,11 @@
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Cellphone Inventory Search</title>
+        <title>EJ's Cellphone Emporium - Search</title>
         <link rel="stylesheet" href="style.css" />
     </head>
     <body>
-        <h1>Cellphone Inventory Search</h1>
+        <h1>EJ's Cellphone Emporium - Search</h1>
         <form id="searchForm">
             <label for="brand">Brand:</label>
             <select id="brand" name="brand">
@@ -94,34 +94,6 @@
                         option.textContent = value;
                         dropdownSelect.appendChild(option);
                     });
-                });
-            }
-
-            function populateBrandDropdown() {
-                const brandSet = new Set(inventory.map((item) => item.brand));
-
-                const brandSelect = document.getElementById("brand");
-
-                brandSet.forEach((brand) => {
-                    const option = document.createElement("option");
-                    option.value = brand;
-                    option.textContent = brand;
-                    brandSelect.appendChild(option);
-                });
-            }
-
-            function populateStorageDropdown() {
-                const storageSet = new Set(
-                    inventory.map((item) => item.storage),
-                );
-
-                const storageSelect = document.getElementById("storage");
-
-                storageSet.forEach((storage) => {
-                    const option = document.createElement("option");
-                    option.value = storage;
-                    option.textContent = storage;
-                    storageSelect.appendChild(option);
                 });
             }
 
