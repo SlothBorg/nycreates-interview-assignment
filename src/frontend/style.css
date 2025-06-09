@@ -61,6 +61,19 @@ select {
     background-color: white;
 }
 
+.sort-button {
+    background: none;
+    border: none;
+    font-size: 0.9em;
+    cursor: pointer;
+    color: #fff;
+    margin-left: 0.25em;
+}
+
+.sort-button:hover {
+    text-decoration: underline;
+}
+
 input:focus,
 select:focus {
     outline: none;

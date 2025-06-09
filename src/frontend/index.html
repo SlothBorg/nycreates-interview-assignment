@@ -32,9 +32,29 @@
                     <tr>
                         <th>Brand</th>
                         <th>Model</th>
-                        <th>Storage</th>
+                        <th>
+                            Storage
+                            <button
+                                type="button"
+                                id="sort-storage"
+                                class="sort-button"
+                                title="Sort by storage"
+                            >
+                                ⇅
+                            </button>
+                        </th>
                         <th>Color</th>
-                        <th>Price</th>
+                        <th>
+                            Price
+                            <button
+                                type="button"
+                                id="sort-price"
+                                class="sort-button"
+                                title="Sort by price"
+                            >
+                                ⇅
+                            </button>
+                        </th>
                     </tr>
                 </thead>
                 <tbody></tbody>
@@ -42,56 +62,60 @@
         </div>
 
         <script>
-            const inventory = [
-                {
-                    brand: "Google",
-                    model: "Pixel 8",
-                    storage: "128 GB",
-                    color: "Obsidian Black",
-                    price: 799.99,
-                },
-                {
-                    brand: "Google",
-                    model: "Pixel 8 Pro",
-                    storage: "256 GB",
-                    color: "Porcelain",
-                    price: 1059.99,
-                },
-                {
-                    brand: "Samsung",
-                    model: "Galaxy S23",
-                    storage: "128 GB",
-                    color: "Lavender",
-                    price: 699.99,
-                },
-                {
-                    brand: "Apple",
-                    model: "iPhone 15",
-                    storage: "128 GB",
-                    color: "Black",
-                    price: 829.99,
-                },
-                {
-                    brand: "Motorola",
-                    model: "Edge 5G",
-                    storage: "256 GB",
-                    color: "Mineral Gray",
-                    price: 659.99,
-                },
-            ];
+            let inventory = [];
+
+            let sortState = {
+                field: null,
+                direction: "asc",
+            };
+
+            async function fetchInventory() {
+                try {
+                    const response = await fetch(
+                        "http://localhost:8080/api?key=this-is-not-secure",
+                        {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/json",
+                            },
+                        },
+                    );
+
+                    const result = await response.json();
+                    console.log("Raw API result:", result);
+
+                    if (!result.success || !Array.isArray(result.data)) {
+                        throw new Error("Invalid data format");
+                    }
+
+                    inventory = result.data;
+                } catch (error) {
+                    console.error("Failed to load inventory:", error);
+                }
+            }
 
             function populateDropdowns() {
-                ["brand", "storage"].forEach((element) => {
-                    const dropdownSet = new Set(
-                        inventory.map((item) => item[element]),
-                    );
-                    const select = document.getElementById(element);
-                    dropdownSet.forEach((value) => {
-                        const option = document.createElement("option");
-                        option.value = value;
-                        option.textContent = value;
-                        select.appendChild(option);
-                    });
+                const brandSelect = document.getElementById("brand");
+                const storageSelect = document.getElementById("storage");
+
+                brandSelect.innerHTML = `<option value="">-- Any --</option>`;
+                storageSelect.innerHTML = `<option value="">-- Any --</option>`;
+
+                const brands = new Set(inventory.map((item) => item.brand));
+                const storages = new Set(inventory.map((item) => item.storage));
+
+                brands.forEach((brand) => {
+                    const option = document.createElement("option");
+                    option.value = brand;
+                    option.textContent = brand;
+                    brandSelect.appendChild(option);
+                });
+
+                storages.forEach((storage) => {
+                    const option = document.createElement("option");
+                    option.value = storage;
+                    option.textContent = storage;
+                    storageSelect.appendChild(option);
                 });
             }
 
@@ -116,15 +140,25 @@
                 phone,
                 { brand, storage, colors, maxPrice },
             ) {
+                const normalize = (str) => str.toLowerCase().trim();
+
                 const matchesBrand =
-                    !brand || phone.brand.toLowerCase().includes(brand);
+                    !brand || normalize(phone.brand).includes(normalize(brand));
+
                 const matchesStorage = !storage || phone.storage === storage;
+
+                const phoneColors = normalize(phone.color).split(/[\s,/]+/);
+
                 const matchesColor =
                     !colors.length ||
                     colors.some((color) =>
-                        phone.color.toLowerCase().includes(color),
+                        phoneColors.some((pc) =>
+                            pc.includes(color.toLowerCase()),
+                        ),
                     );
+
                 const matchesPrice = isNaN(maxPrice) || phone.price <= maxPrice;
+
                 return (
                     matchesBrand &&
                     matchesStorage &&
@@ -135,61 +169,129 @@
 
             function renderResultsOnce() {
                 const tbody = document.querySelector("#resultsTable tbody");
+                const table = document.getElementById("resultsTable");
+
                 tbody.innerHTML = "";
 
                 inventory.forEach((phone, index) => {
                     const row = document.createElement("tr");
                     row.setAttribute("data-index", index);
                     row.innerHTML = `
-                            <td data-label="Brand">${phone.brand}</td>
-                            <td data-label="Model">${phone.model}</td>
-                            <td data-label="Storage">${phone.storage}</td>
-                            <td data-label="Color">${phone.color}</td>
-                            <td data-label="Price">$${phone.price.toFixed(2)}</td>
-                        `;
+                        <td data-label="Brand">${phone.brand}</td>
+                        <td data-label="Model">${phone.model}</td>
+                        <td data-label="Storage">${phone.storage}</td>
+                        <td data-label="Color">${phone.color}</td>
+                        <td data-label="Price">$${phone.price.toFixed(2)}</td>
+                    `;
                     tbody.appendChild(row);
                 });
 
-                const table = document.getElementById("resultsTable");
                 table.classList.remove("hidden");
+            }
+
+            function sortFilteredResults(filtered) {
+                if (!sortState.field) return filtered;
+
+                const dir = sortState.direction === "asc" ? 1 : -1;
+
+                if (sortState.field === "price") {
+                    return filtered.sort(
+                        (a, b) => (a.phone.price - b.phone.price) * dir,
+                    );
+                }
+
+                if (sortState.field === "storage") {
+                    return filtered.sort(
+                        (a, b) =>
+                            (normalizeStorage(a.phone.storage) -
+                                normalizeStorage(b.phone.storage)) *
+                            dir,
+                    );
+                }
+
+                return filtered;
+            }
+
+            function normalizeStorage(str) {
+                const [num, unit] = str.toUpperCase().split(/\s+/);
+                const value = parseFloat(num);
+                if (isNaN(value)) return 0;
+
+                switch (unit) {
+                    case "TB":
+                        return value * 1024;
+                    case "GB":
+                    default:
+                        return value;
+                }
             }
 
             function filterDisplayedRows() {
                 const params = getSearchParams();
-                const rows = document.querySelectorAll(
-                    "#resultsTable tbody tr",
-                );
+
+                let filtered = inventory
+                    .map((phone, index) => ({ phone, index }))
+                    .filter(({ phone }) => matchesFilter(phone, params));
+
+                filtered = sortFilteredResults(filtered);
+
+                const tbody = document.querySelector("#resultsTable tbody");
+                tbody.innerHTML = "";
 
                 let anyVisible = false;
 
-                rows.forEach((row) => {
-                    const index = row.getAttribute("data-index");
-                    const phone = inventory[index];
-                    if (matchesFilter(phone, params)) {
-                        row.classList.remove("hidden");
-                        anyVisible = true;
-                    } else {
-                        row.classList.add("hidden");
-                    }
+                filtered.forEach(({ phone }, i) => {
+                    const row = document.createElement("tr");
+                    row.innerHTML = `
+                        <td data-label="Brand">${phone.brand}</td>
+                        <td data-label="Model">${phone.model}</td>
+                        <td data-label="Storage">${phone.storage}</td>
+                        <td data-label="Color">${phone.color}</td>
+                        <td data-label="Price">$${phone.price.toFixed(2)}</td>
+                    `;
+                    tbody.appendChild(row);
+                    anyVisible = true;
                 });
 
                 const table = document.getElementById("resultsTable");
-                if (anyVisible) {
-                    table.classList.remove("hidden");
-                    table.classList.add("visible");
-                } else {
-                    table.classList.add("hidden");
-                    table.classList.remove("visible");
-                }
+                table.classList.toggle("hidden", !anyVisible);
+                table.classList.toggle("visible", anyVisible);
             }
 
-            window.onload = function () {
+            function setupSortButton(columnId, fieldName) {
+                const button = document.getElementById(columnId);
+                if (!button) return;
+
+                button.addEventListener("click", () => {
+                    if (sortState.field === fieldName) {
+                        sortState.direction =
+                            sortState.direction === "asc" ? "desc" : "asc";
+                    } else {
+                        sortState.field = fieldName;
+                        sortState.direction = "asc";
+                    }
+                    filterDisplayedRows();
+                });
+            }
+
+            window.onload = async function () {
+                await fetchInventory();
+
+                if (!inventory || inventory.length === 0) {
+                    console.warn("Inventory is empty or not loaded.");
+                    return;
+                }
+
                 populateDropdowns();
                 renderResultsOnce();
                 filterDisplayedRows();
                 document
                     .getElementById("searchForm")
                     .addEventListener("input", filterDisplayedRows);
+
+                ["price", "storage"].forEach((field) => {
+                    setupSortButton(`sort-${field}`, field);
+                });
             };
         </script>
     </body>
