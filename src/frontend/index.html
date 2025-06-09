@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>EJ's Cellphone Emporium - Search</title>
+        <link rel="stylesheet" href="style.css" />
+    </head>
+    <body>
+        <h1>EJ's Cellphone Emporium</h1>
+        <div class="container">
+            <form id="searchForm">
+                <label for="brand">Brand:</label>
+                <select id="brand" name="brand">
+                    <option value="">-- Any --</option>
+                </select>
+
+                <label for="storage">Storage:</label>
+                <select id="storage" name="storage">
+                    <option value="">-- Any --</option>
+                </select>
+
+                <label for="color">Color (comma-separated):</label>
+                <input type="text" id="color" name="color" />
+
+                <label for="price">Max Price:</label>
+                <input type="number" id="price" name="price" step="0.01" />
+            </form>
+
+            <table id="resultsTable" class="hidden">
+                <thead>
+                    <tr>
+                        <th>Brand</th>
+                        <th>Model</th>
+                        <th>Storage</th>
+                        <th>Color</th>
+                        <th>Price</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
+        <script>
+            const inventory = [
+                {
+                    brand: "Google",
+                    model: "Pixel 8",
+                    storage: "128 GB",
+                    color: "Obsidian Black",
+                    price: 799.99,
+                },
+                {
+                    brand: "Google",
+                    model: "Pixel 8 Pro",
+                    storage: "256 GB",
+                    color: "Porcelain",
+                    price: 1059.99,
+                },
+                {
+                    brand: "Samsung",
+                    model: "Galaxy S23",
+                    storage: "128 GB",
+                    color: "Lavender",
+                    price: 699.99,
+                },
+                {
+                    brand: "Apple",
+                    model: "iPhone 15",
+                    storage: "128 GB",
+                    color: "Black",
+                    price: 829.99,
+                },
+                {
+                    brand: "Motorola",
+                    model: "Edge 5G",
+                    storage: "256 GB",
+                    color: "Mineral Gray",
+                    price: 659.99,
+                },
+            ];
+
+            function populateDropdowns() {
+                ["brand", "storage"].forEach((element) => {
+                    const dropdownSet = new Set(
+                        inventory.map((item) => item[element]),
+                    );
+                    const select = document.getElementById(element);
+                    dropdownSet.forEach((value) => {
+                        const option = document.createElement("option");
+                        option.value = value;
+                        option.textContent = value;
+                        select.appendChild(option);
+                    });
+                });
+            }
+
+            function getSearchParams() {
+                const brand = document
+                    .getElementById("brand")
+                    .value.toLowerCase();
+                const storage = document.getElementById("storage").value;
+                const colors = document
+                    .getElementById("color")
+                    .value.toLowerCase()
+                    .split(",")
+                    .map((c) => c.trim())
+                    .filter(Boolean);
+                const maxPrice = parseFloat(
+                    document.getElementById("price").value,
+                );
+                return { brand, storage, colors, maxPrice };
+            }
+
+            function matchesFilter(
+                phone,
+                { brand, storage, colors, maxPrice },
+            ) {
+                const matchesBrand =
+                    !brand || phone.brand.toLowerCase().includes(brand);
+                const matchesStorage = !storage || phone.storage === storage;
+                const matchesColor =
+                    !colors.length ||
+                    colors.some((color) =>
+                        phone.color.toLowerCase().includes(color),
+                    );
+                const matchesPrice = isNaN(maxPrice) || phone.price <= maxPrice;
+                return (
+                    matchesBrand &&
+                    matchesStorage &&
+                    matchesColor &&
+                    matchesPrice
+                );
+            }
+
+            function renderResultsOnce() {
+                const tbody = document.querySelector("#resultsTable tbody");
+                tbody.innerHTML = "";
+
+                inventory.forEach((phone, index) => {
+                    const row = document.createElement("tr");
+                    row.setAttribute("data-index", index);
+                    row.innerHTML = `
+                            <td data-label="Brand">${phone.brand}</td>
+                            <td data-label="Model">${phone.model}</td>
+                            <td data-label="Storage">${phone.storage}</td>
+                            <td data-label="Color">${phone.color}</td>
+                            <td data-label="Price">$${phone.price.toFixed(2)}</td>
+                        `;
+                    tbody.appendChild(row);
+                });
+
+                const table = document.getElementById("resultsTable");
+                table.classList.remove("hidden");
+            }
+
+            function filterDisplayedRows() {
+                const params = getSearchParams();
+                const rows = document.querySelectorAll(
+                    "#resultsTable tbody tr",
+                );
+
+                let anyVisible = false;
+
+                rows.forEach((row) => {
+                    const index = row.getAttribute("data-index");
+                    const phone = inventory[index];
+                    if (matchesFilter(phone, params)) {
+                        row.classList.remove("hidden");
+                        anyVisible = true;
+                    } else {
+                        row.classList.add("hidden");
+                    }
+                });
+
+                const table = document.getElementById("resultsTable");
+                if (anyVisible) {
+                    table.classList.remove("hidden");
+                    table.classList.add("visible");
+                } else {
+                    table.classList.add("hidden");
+                    table.classList.remove("visible");
+                }
+            }
+
+            window.onload = function () {
+                populateDropdowns();
+                renderResultsOnce();
+                filterDisplayedRows();
+                document
+                    .getElementById("searchForm")
+                    .addEventListener("input", filterDisplayedRows);
+            };
+        </script>
+    </body>
+</html>
