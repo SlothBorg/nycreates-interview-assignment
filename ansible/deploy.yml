@@ -55,12 +55,22 @@
         group: "{{ app_user }}"
         mode: "0644"
 
+    - name: Initialize Go module if go.mod doesn't exist
+      shell: |
+        cd {{ app_dir }}
+        if [ ! -f go.mod ]; then
+          /usr/local/go/bin/go mod init webapp
+        fi
+      become_user: "{{ app_user }}"
+
     - name: Build Go application
       shell: |
         cd {{ app_dir }}
         /usr/local/go/bin/go mod tidy
         /usr/local/go/bin/go build -o webapp .
       become_user: "{{ app_user }}"
+      environment:
+        PATH: "/usr/local/go/bin:{{ ansible_env.PATH }}"
 
     - name: Create systemd service file
       copy:

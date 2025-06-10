@@ -3,7 +3,6 @@ name: Deploy to DigitalOcean
 on:
   push:
     branches: [devops-testing]
-  workflow_dispatch:
 
 jobs:
   deploy:
