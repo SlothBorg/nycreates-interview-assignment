@@ -1,0 +1,140 @@
+---
+- name: Deploy Go Web Application
+  hosts: droplet
+  remote_user: root
+  become: yes
+  vars:
+    app_user: webapp
+    app_dir: /home/webapp/app
+
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+
+    - name: Install required packages
+      apt:
+        name:
+          - nginx
+          - ufw
+        state: present
+
+    - name: Download and install Go
+      unarchive:
+        src: https://go.dev/dl/go1.21.5.linux-amd64.tar.gz
+        dest: /usr/local
+        remote_src: yes
+        creates: /usr/local/go/bin/go
+
+    - name: Add Go to PATH
+      lineinfile:
+        path: /etc/profile
+        line: "export PATH=$PATH:/usr/local/go/bin"
+        create: yes
+
+    - name: Create webapp user
+      user:
+        name: "{{ app_user }}"
+        shell: /bin/bash
+        home: /home/webapp
+        create_home: yes
+
+    - name: Create app directory
+      file:
+        path: "{{ app_dir }}"
+        state: directory
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: "0755"
+
+    - name: Copy application files
+      copy:
+        src: ../src/
+        dest: "{{ app_dir }}/"
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: "0644"
+
+    - name: Build Go application
+      shell: |
+        cd {{ app_dir }}
+        /usr/local/go/bin/go mod tidy
+        /usr/local/go/bin/go build -o webapp .
+      become_user: "{{ app_user }}"
+
+    - name: Create systemd service file
+      copy:
+        content: |
+          [Unit]
+          Description=Go Web Application
+          After=network.target
+
+          [Service]
+          Type=simple
+          User={{ app_user }}
+          WorkingDirectory={{ app_dir }}
+          ExecStart={{ app_dir }}/webapp
+          Restart=always
+          RestartSec=5
+
+          [Install]
+          WantedBy=multi-user.target
+        dest: /etc/systemd/system/webapp.service
+        mode: "0644"
+
+    - name: Reload systemd and start webapp service
+      systemd:
+        name: webapp
+        enabled: yes
+        state: started
+        daemon_reload: yes
+
+    - name: Configure nginx
+      copy:
+        content: |
+          server {
+              listen 80;
+              server_name _;
+
+              location / {
+                  proxy_pass http://localhost:8080;
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto $scheme;
+              }
+          }
+        dest: /etc/nginx/sites-available/webapp
+        mode: "0644"
+
+    - name: Enable nginx site
+      file:
+        src: /etc/nginx/sites-available/webapp
+        dest: /etc/nginx/sites-enabled/webapp
+        state: link
+
+    - name: Remove default nginx site
+      file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+
+    - name: Test nginx configuration
+      command: nginx -t
+
+    - name: Restart nginx
+      systemd:
+        name: nginx
+        state: restarted
+
+    - name: Configure firewall
+      ufw:
+        rule: allow
+        port: "{{ item }}"
+      loop:
+        - "22"
+        - "80"
+        - "443"
+
+    - name: Enable firewall
+      ufw:
+        state: enabled

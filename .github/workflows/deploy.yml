@@ -1,0 +1,76 @@
+name: Deploy to DigitalOcean
+
+on:
+  push:
+    branches: [devops-testing]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.0
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H github.com >> ~/.ssh/known_hosts
+
+      - name: Terraform Init
+        working-directory: ./terraform
+        run: terraform init
+
+      - name: Terraform Plan
+        working-directory: ./terraform
+        env:
+          TF_VAR_do_token: ${{ secrets.DO_TOKEN }}
+          TF_VAR_droplet_name: ${{ secrets.DROPLET_NAME }}
+          TF_VAR_ssh_key_name: ${{ secrets.SSH_KEY_NAME }}
+        run: terraform plan
+
+      - name: Terraform Apply
+        working-directory: ./terraform
+        env:
+          TF_VAR_do_token: ${{ secrets.DO_TOKEN }}
+          TF_VAR_droplet_name: ${{ secrets.DROPLET_NAME }}
+          TF_VAR_ssh_key_name: ${{ secrets.SSH_KEY_NAME }}
+        run: terraform apply -auto-approve
+
+      - name: Get Droplet IP
+        working-directory: ./terraform
+        run: |
+          echo "DROPLET_IP=$(terraform output -raw droplet_ip)" >> $GITHUB_ENV
+
+      - name: Wait for SSH to be ready
+        run: |
+          for i in {1..30}; do
+            if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 root@${{ env.DROPLET_IP }} exit; then
+              echo "SSH is ready"
+              break
+            fi
+            echo "Waiting for SSH... ($i/30)"
+            sleep 10
+          done
+
+      - name: Setup Ansible
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ansible
+
+      - name: Create Ansible inventory
+        run: |
+          sed "s/DROPLET_IP/${{ env.DROPLET_IP }}/g" ansible/inventory.ini > ansible/hosts
+
+      - name: Run Ansible playbook
+        run: |
+          cd ansible
+          ansible-playbook -i hosts deploy.yml
