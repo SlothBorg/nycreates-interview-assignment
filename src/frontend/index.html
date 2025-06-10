@@ -71,15 +71,12 @@
 
             async function fetchInventory() {
                 try {
-                    const response = await fetch(
-                        "http://localhost:8080/api?key=EKkp9eaaxQFGcp9j6n236ZztTjo3cWvHp7Aga5XHJLhynnpZgcQ8pJbLXKn2VJwy",
-                        {
-                            method: "POST",
-                            headers: {
-                                "Content-Type": "application/json",
-                            },
+                    const response = await fetch("/api", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
                         },
-                    );
+                    });
 
                     const result = await response.json();
                     console.log("Raw API result:", result);

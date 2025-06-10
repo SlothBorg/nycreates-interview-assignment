@@ -1,0 +1,258 @@
+---
+- name: Deploy Go Web Application
+  hosts: droplet
+  remote_user: root
+  become: yes
+  vars:
+    app_user: webapp
+    app_dir: /home/webapp/app
+
+  tasks:
+    - name: Wait for apt lock to be released
+      shell: |
+        while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
+          echo "Waiting for apt lock to be released..."
+          sleep 5
+        done
+      changed_when: false
+
+    - name: Kill any hanging apt processes
+      shell: |
+        pkill -f apt-get || true
+        pkill -f dpkg || true
+        pkill -f unattended-upgrade || true
+      changed_when: false
+      ignore_errors: yes
+
+    - name: Remove apt locks if they exist
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /var/lib/dpkg/lock-frontend
+        - /var/lib/dpkg/lock
+        - /var/cache/apt/archives/lock
+      ignore_errors: yes
+
+    - name: Configure dpkg
+      shell: dpkg --configure -a
+      ignore_errors: yes
+
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        force_apt_get: yes
+
+    - name: Install required packages
+      apt:
+        name:
+          - nginx
+          - ufw
+          - tree
+        state: present
+        force_apt_get: yes
+
+    - name: Download and install Go
+      unarchive:
+        src: https://go.dev/dl/go1.21.5.linux-amd64.tar.gz
+        dest: /usr/local
+        remote_src: yes
+        creates: /usr/local/go/bin/go
+
+    - name: Add Go to PATH
+      lineinfile:
+        path: /etc/profile
+        line: "export PATH=$PATH:/usr/local/go/bin"
+        create: yes
+
+    - name: Create webapp user
+      user:
+        name: "{{ app_user }}"
+        shell: /bin/bash
+        home: /home/webapp
+        create_home: yes
+
+    - name: Create app directory
+      file:
+        path: "{{ app_dir }}"
+        state: directory
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: "0755"
+
+    - name: Copy entire src directory
+      copy:
+        src: "../src/"
+        dest: "{{ app_dir }}"
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: "0644"
+        directory_mode: "0755"
+
+    - name: Set proper permissions for nginx to access frontend files
+      file:
+        path: "{{ item }}"
+        mode: "0755"
+        state: directory
+      loop:
+        - "/home/webapp"
+        - "{{ app_dir }}"
+        - "{{ app_dir }}/frontend"
+
+    - name: Make frontend files readable by nginx
+      file:
+        path: "{{ app_dir }}/frontend"
+        mode: "0755"
+        recurse: yes
+        state: directory
+
+    - name: Set frontend files to be readable by all
+      shell: |
+        chmod -R 644 {{ app_dir }}/frontend/*
+        find {{ app_dir }}/frontend -type d -exec chmod 755 {} \;
+
+    - name: Ensure nginx can read the frontend directory (final check)
+      shell: |
+        chmod 755 /home/webapp /home/webapp/app /home/webapp/app/frontend
+        find /home/webapp/app/frontend -type f -exec chmod 644 {} \;
+        find /home/webapp/app/frontend -type d -exec chmod 755 {} \;
+
+    - name: Debug - List files in app directory
+      shell: ls -la {{ app_dir }}/
+      register: app_files
+
+    - name: Debug - Show app files
+      debug:
+        var: app_files.stdout_lines
+
+    - name: Find Go files in subdirectories
+      shell: find {{ app_dir }} -name "*.go" -type f
+      register: go_files
+
+    - name: Debug - Show Go files found
+      debug:
+        var: go_files.stdout_lines
+
+    - name: Determine Go application directory
+      shell: find {{ app_dir }} -name "*.go" -type f | head -1 | xargs dirname
+      register: go_app_dir
+      failed_when: go_files.stdout_lines | length == 0
+
+    - name: Debug - Show determined app directory
+      debug:
+        var: go_app_dir.stdout
+
+    - name: Initialize Go module in determined directory
+      shell: |
+        cd {{ go_app_dir.stdout }}
+        if [ ! -f go.mod ]; then
+          /usr/local/go/bin/go mod init webapp
+        fi
+      become_user: "{{ app_user }}"
+      environment:
+        PATH: "/usr/local/go/bin:{{ ansible_env.PATH }}"
+
+    - name: Build Go application from determined directory
+      shell: |
+        cd {{ go_app_dir.stdout }}
+        /usr/local/go/bin/go mod tidy
+        /usr/local/go/bin/go build -o {{ app_dir }}/webapp .
+      become_user: "{{ app_user }}"
+      environment:
+        PATH: "/usr/local/go/bin:{{ ansible_env.PATH }}"
+
+    - name: Copy inventory.json to working directory if it exists
+      copy:
+        src: "{{ go_app_dir.stdout }}/inventory.json"
+        dest: "{{ app_dir }}/inventory.json"
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: "0644"
+        remote_src: yes
+      ignore_errors: yes
+
+    - name: Create systemd service file
+      copy:
+        content: |
+          [Unit]
+          Description=Go Web Application
+          After=network.target
+
+          [Service]
+          Type=simple
+          User={{ app_user }}
+          WorkingDirectory={{ app_dir }}
+          ExecStart={{ app_dir }}/webapp
+          Restart=always
+          RestartSec=5
+          Environment=PORT=8080
+
+          [Install]
+          WantedBy=multi-user.target
+        dest: /etc/systemd/system/webapp.service
+        mode: "0644"
+
+    - name: Reload systemd and start webapp service
+      systemd:
+        name: webapp
+        enabled: yes
+        state: started
+        daemon_reload: yes
+
+    - name: Configure nginx
+      copy:
+        content: |
+          server {
+              listen 80;
+              server_name _;
+
+              # Serve static frontend files
+              location / {
+                  root /home/webapp/app/frontend;
+                  try_files $uri $uri/ /index.html;
+                  index index.html;
+              }
+
+              # Proxy API requests to Go backend
+              location /api {
+                  proxy_pass http://localhost:8080/api;
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto $scheme;
+              }
+          }
+        dest: /etc/nginx/sites-available/webapp
+        mode: "0644"
+
+    - name: Enable nginx site
+      file:
+        src: /etc/nginx/sites-available/webapp
+        dest: /etc/nginx/sites-enabled/webapp
+        state: link
+
+    - name: Remove default nginx site
+      file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+
+    - name: Test nginx configuration
+      command: nginx -t
+
+    - name: Restart nginx
+      systemd:
+        name: nginx
+        state: restarted
+
+    - name: Configure firewall
+      ufw:
+        rule: allow
+        port: "{{ item }}"
+      loop:
+        - "22"
+        - "80"
+        - "443"
+
+    - name: Enable firewall
+      ufw:
+        state: enabled
