@@ -64,9 +64,26 @@
       debug:
         var: app_files.stdout_lines
 
-    - name: Initialize Go module if go.mod doesn't exist
+    - name: Find Go files in subdirectories
+      shell: find {{ app_dir }} -name "*.go" -type f
+      register: go_files
+
+    - name: Debug - Show Go files found
+      debug:
+        var: go_files.stdout_lines
+
+    - name: Determine Go application directory
+      shell: find {{ app_dir }} -name "*.go" -type f | head -1 | xargs dirname
+      register: go_app_dir
+      failed_when: go_files.stdout_lines | length == 0
+
+    - name: Debug - Show determined app directory
+      debug:
+        var: go_app_dir.stdout
+
+    - name: Initialize Go module in determined directory
       shell: |
-        cd {{ app_dir }}
+        cd {{ go_app_dir.stdout }}
         if [ ! -f go.mod ]; then
           /usr/local/go/bin/go mod init webapp
         fi
@@ -74,11 +91,11 @@
       environment:
         PATH: "/usr/local/go/bin:{{ ansible_env.PATH }}"
 
-    - name: Build Go application
+    - name: Build Go application from determined directory
       shell: |
-        cd {{ app_dir }}
+        cd {{ go_app_dir.stdout }}
         /usr/local/go/bin/go mod tidy
-        /usr/local/go/bin/go build -o webapp .
+        /usr/local/go/bin/go build -o {{ app_dir }}/webapp .
       become_user: "{{ app_user }}"
       environment:
         PATH: "/usr/local/go/bin:{{ ansible_env.PATH }}"
