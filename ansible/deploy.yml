@@ -48,7 +48,6 @@
         name:
           - nginx
           - ufw
-          - tree
         state: present
         force_apt_get: yes
 
@@ -161,6 +160,16 @@
       environment:
         PATH: "/usr/local/go/bin:{{ ansible_env.PATH }}"
 
+    - name: Copy inventory.json to working directory if it exists
+      copy:
+        src: "{{ go_app_dir.stdout }}/inventory.json"
+        dest: "{{ app_dir }}/inventory.json"
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: "0644"
+        remote_src: yes
+      ignore_errors: yes
+
     - name: Create systemd service file
       copy:
         content: |
@@ -203,13 +212,20 @@
                   index index.html;
               }
 
-              location = /api {
-                  proxy_pass http://localhost:8080/api;
+              # Proxy API requests to Go backend
+              location /api/ {
+                  proxy_pass http://localhost:8080/api/;
                   proxy_set_header Host $host;
                   proxy_set_header X-Real-IP $remote_addr;
                   proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
                   proxy_set_header X-Forwarded-Proto $scheme;
-                  proxy_method $request_method;
+              }
+
+              # Optional: serve static assets with longer cache
+              location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg)$ {
+                  root /home/webapp/app/frontend;
+                  expires 1y;
+                  add_header Cache-Control "public, immutable";
               }
           }
         dest: /etc/nginx/sites-available/webapp
