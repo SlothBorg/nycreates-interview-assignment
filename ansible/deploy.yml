@@ -47,13 +47,23 @@
         group: "{{ app_user }}"
         mode: "0755"
 
-    - name: Copy application files
+    - name: Copy Go source files individually
       copy:
-        src: ../src/
+        src: "{{ item }}"
         dest: "{{ app_dir }}/"
         owner: "{{ app_user }}"
         group: "{{ app_user }}"
         mode: "0644"
+      with_fileglob:
+        - "../src/*"
+
+    - name: Debug - List files in app directory
+      shell: ls -la {{ app_dir }}/
+      register: app_files
+
+    - name: Debug - Show app files
+      debug:
+        var: app_files.stdout_lines
 
     - name: Initialize Go module if go.mod doesn't exist
       shell: |
@@ -62,6 +72,8 @@
           /usr/local/go/bin/go mod init webapp
         fi
       become_user: "{{ app_user }}"
+      environment:
+        PATH: "/usr/local/go/bin:{{ ansible_env.PATH }}"
 
     - name: Build Go application
       shell: |
