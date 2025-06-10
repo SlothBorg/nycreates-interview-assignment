@@ -27,13 +27,22 @@ provider "digitalocean" {
   token = var.do_token
 }
 
+# Check if droplet with the same name already exists
+data "digitalocean_droplets" "existing" {
+  filter {
+    key    = "name"
+    values = [var.droplet_name]
+  }
+}
+
 # Get existing SSH key from DigitalOcean
 data "digitalocean_ssh_key" "main" {
   name = var.ssh_key_name
 }
 
-# Create droplet
+# Create droplet only if one with the same name doesn't exist
 resource "digitalocean_droplet" "web" {
+  count  = length(data.digitalocean_droplets.existing.droplets) == 0 ? 1 : 0
   image  = "ubuntu-22-04-x64"
   name   = var.droplet_name
   region = "nyc3"
@@ -43,7 +52,18 @@ resource "digitalocean_droplet" "web" {
   tags = ["terraform", "webapp"]
 }
 
-# Output the droplet IP
+# Use existing droplet if it exists, otherwise use the newly created one
+locals {
+  droplet_ip = length(data.digitalocean_droplets.existing.droplets) > 0 ? data.digitalocean_droplets.existing.droplets[0].ipv4_address : digitalocean_droplet.web[0].ipv4_address
+  droplet_id = length(data.digitalocean_droplets.existing.droplets) > 0 ? data.digitalocean_droplets.existing.droplets[0].id : digitalocean_droplet.web[0].id
+}
+
+# Output the droplet IP (whether existing or newly created)
 output "droplet_ip" {
-  value = digitalocean_droplet.web.ipv4_address
+  value = local.droplet_ip
+}
+
+# Output droplet status for debugging
+output "droplet_status" {
+  value = length(data.digitalocean_droplets.existing.droplets) > 0 ? "Using existing droplet" : "Created new droplet"
 }
