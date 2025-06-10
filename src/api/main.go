@@ -27,7 +27,6 @@ type Response struct {
 
 type Config struct {
 	Enviroment    string
-	APIKey        string
 	InventoryFile string
 	Port          string
 }
@@ -39,11 +38,6 @@ func loadConfig() Config {
 	enviroment := os.Getenv("ENVIROMENT")
 	if enviroment == "" {
 		enviroment = "dev"
-	}
-
-	apiKey := os.Getenv("API_KEY")
-	if apiKey == "" {
-		apiKey = "this-is-not-secure"
 	}
 
 	inventoryFile := os.Getenv("INVENTORY_FILE")
@@ -58,7 +52,6 @@ func loadConfig() Config {
 
 	return Config{
 		Enviroment:	   enviroment,
-		APIKey:        apiKey,
 		InventoryFile: inventoryFile,
 		Port:          port,
 	}
@@ -105,16 +98,11 @@ func enableCORS(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-func isValidAPIKey(key string) bool {
-	return key == config.APIKey
-}
-
 func inventoryHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Printf("Got a request!\n")
 
 	w.Header().Set("Content-Type", "application/json")
 
-	// 404 on non-POST requests
 	if r.Method != "POST" {
 		w.WriteHeader(http.StatusNotFound)
 		w.Write([]byte("404 page not found"))
@@ -122,17 +110,6 @@ func inventoryHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	apiKey := r.URL.Query().Get("key")
-
-	// Check if key is valid
-	if apiKey == "" || !isValidAPIKey(apiKey) {
-		response := Response{
-			Success: false,
-			Message: "Invalid API key",
-		}
-		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(response)
-		return
-	}
 
 	response := Response{
 		Success: true,
