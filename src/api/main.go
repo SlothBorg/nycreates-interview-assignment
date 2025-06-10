@@ -164,7 +164,7 @@ func main() {
 
 	fmt.Printf("Server starting on port %s\n", config.Port)
 	if config.Enviroment == "dev" {
-		fmt.Printf("Try:\n\tcurl -X POST \"http://localhost:%s/api?key=%s\"\n", config.Port, config.APIKey)
+		fmt.Printf("Try:\n\tcurl -X POST \"http://localhost:%s/api\"\n", config.Port)
 	}
 
 	log.Fatal(http.ListenAndServe(":"+config.Port, nil))
