@@ -26,4 +26,4 @@ go build -o main.go
 
 This project uses [GitHub Actions](https://github.com/features/actions), [Terraform](https://developer.hashicorp.com/terraform) and [Ansible](https://www.redhat.com/en/ansible-collaborative) to automate the creation of a VM, and the deployment of the web app to that vm.
 
-The GitHub action (see [.github](/.github)) triggers on push to the `main` branch, this action uses a number of secrets to store API keys and the like. The action then runs the Terraform script (see [terraform](/terraform)) which spins up a VM in Digital Ocean, if a VM with the predefined name exists it skips the deployment and moves on to the Ansible playbook. The playbook (see [ansible](/ansible)) configures the server, installs and sets up nginx and then copies over the webapp.
+The GitHub action (see [.github](/.github)) triggers on push to the `main` branch and when push launches the Terraform (see [terraform](/terraform))
