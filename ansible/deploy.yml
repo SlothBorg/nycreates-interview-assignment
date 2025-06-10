@@ -47,15 +47,14 @@
         group: "{{ app_user }}"
         mode: "0755"
 
-    - name: Copy Go source files individually
+    - name: Copy entire src directory
       copy:
-        src: "{{ item }}"
-        dest: "{{ app_dir }}/"
+        src: "../src/"
+        dest: "{{ app_dir }}"
         owner: "{{ app_user }}"
         group: "{{ app_user }}"
         mode: "0644"
-      with_fileglob:
-        - "../src/*"
+        directory_mode: "0755"
 
     - name: Debug - List files in app directory
       shell: ls -la {{ app_dir }}/
