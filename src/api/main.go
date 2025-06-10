@@ -109,8 +109,6 @@ func inventoryHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	apiKey := r.URL.Query().Get("key")
-
 	response := Response{
 		Success: true,
 		Data:    inventory,
