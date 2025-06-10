@@ -114,6 +114,7 @@
           ExecStart={{ app_dir }}/webapp
           Restart=always
           RestartSec=5
+          Environment=PORT=8080
 
           [Install]
           WantedBy=multi-user.target
@@ -134,12 +135,27 @@
               listen 80;
               server_name _;
 
+              # Serve static frontend files
               location / {
-                  proxy_pass http://localhost:8080;
+                  root /home/webapp/app/frontend;
+                  try_files $uri $uri/ /index.html;
+                  index index.html;
+              }
+
+              # Proxy API requests to Go backend
+              location /api/ {
+                  proxy_pass http://localhost:8080/api/;
                   proxy_set_header Host $host;
                   proxy_set_header X-Real-IP $remote_addr;
                   proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
                   proxy_set_header X-Forwarded-Proto $scheme;
+              }
+
+              # Optional: serve static assets with longer cache
+              location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg)$ {
+                  root /home/webapp/app/frontend;
+                  expires 1y;
+                  add_header Cache-Control "public, immutable";
               }
           }
         dest: /etc/nginx/sites-available/webapp
