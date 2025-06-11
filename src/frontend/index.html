@@ -33,27 +33,57 @@
             <table id="resultsTable" class="hidden">
                 <thead>
                     <tr>
-                        <th>Brand</th>
-                        <th>Model</th>
+                        <th>
+                            Brand
+                            <button
+                                type="button"
+                                id="sort-brand"
+                                class="sort-button"
+                                title="Sort by Brand"
+                            >
+                                ⇅
+                            </button>
+                        </th>
+                        <th>
+                            Model
+                            <button
+                                type="button"
+                                id="sort-model"
+                                class="sort-button"
+                                title="Sort by Model"
+                            >
+                                ⇅
+                            </button>
+                        </th>
                         <th>
                             Storage
                             <button
                                 type="button"
                                 id="sort-storage"
                                 class="sort-button"
-                                title="Sort by storage"
+                                title="Sort by Storage"
                             >
                                 ⇅
                             </button>
                         </th>
-                        <th>Color</th>
+                        <th>
+                            Color
+                            <button
+                                type="button"
+                                id="sort-color"
+                                class="sort-button"
+                                title="Sort by Color"
+                            >
+                                ⇅
+                            </button>
+                        </th>
                         <th>
                             Price
                             <button
                                 type="button"
                                 id="sort-price"
                                 class="sort-button"
-                                title="Sort by price"
+                                title="Sort by Price"
                             >
                                 ⇅
                             </button>
@@ -196,22 +226,35 @@
 
                 const dir = sortState.direction === "asc" ? 1 : -1;
 
-                if (sortState.field === "price") {
-                    return filtered.sort(
-                        (a, b) => (a.phone.price - b.phone.price) * dir,
-                    );
-                }
+                switch (sortState.field) {
+                    case "price":
+                        return filtered.sort(
+                            (a, b) => (a.phone.price - b.phone.price) * dir,
+                        );
 
-                if (sortState.field === "storage") {
-                    return filtered.sort(
-                        (a, b) =>
-                            (normalizeStorage(a.phone.storage) -
-                                normalizeStorage(b.phone.storage)) *
-                            dir,
-                    );
-                }
+                    case "storage":
+                        return filtered.sort(
+                            (a, b) =>
+                                (normalizeStorage(a.phone.storage) -
+                                    normalizeStorage(b.phone.storage)) *
+                                dir,
+                        );
 
-                return filtered;
+                    case "brand":
+                    case "model":
+                    case "color":
+                        return filtered.sort(
+                            (a, b) =>
+                                a.phone[sortState.field].localeCompare(
+                                    b.phone[sortState.field],
+                                    undefined,
+                                    { sensitivity: "base" },
+                                ) * dir,
+                        );
+
+                    default:
+                        return filtered;
+                }
             }
 
             function normalizeStorage(str) {
@@ -291,9 +334,11 @@
                     .getElementById("searchForm")
                     .addEventListener("input", filterDisplayedRows);
 
-                ["price", "storage"].forEach((field) => {
-                    setupSortButton(`sort-${field}`, field);
-                });
+                ["price", "storage", "brand", "model", "color"].forEach(
+                    (field) => {
+                        setupSortButton(`sort-${field}`, field);
+                    },
+                );
             };
         </script>
     </body>
