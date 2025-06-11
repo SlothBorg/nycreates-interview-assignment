@@ -14,7 +14,10 @@
                 <select id="brand" name="brand">
                     <option value="">-- Any --</option>
                 </select>
-
+                <label for="model">Model:</label>
+                <select id="model" name="model">
+                    <option value="">-- Any --</option>
+                </select>
                 <label for="storage">Storage:</label>
                 <select id="storage" name="storage">
                     <option value="">-- Any --</option>
@@ -79,7 +82,6 @@
                     });
 
                     const result = await response.json();
-                    console.log("Raw API result:", result);
 
                     if (!result.success || !Array.isArray(result.data)) {
                         throw new Error("Invalid data format");
@@ -91,28 +93,19 @@
                 }
             }
 
-            function populateDropdowns() {
-                const brandSelect = document.getElementById("brand");
-                const storageSelect = document.getElementById("storage");
+            function populateDropdowns(fields) {
+                fields.forEach((field) => {
+                    const select = document.getElementById(field);
 
-                brandSelect.innerHTML = `<option value="">-- Any --</option>`;
-                storageSelect.innerHTML = `<option value="">-- Any --</option>`;
+                    select.innerHTML = '<option value="">-- Any --</option>';
 
-                const brands = new Set(inventory.map((item) => item.brand));
-                const storages = new Set(inventory.map((item) => item.storage));
-
-                brands.forEach((brand) => {
-                    const option = document.createElement("option");
-                    option.value = brand;
-                    option.textContent = brand;
-                    brandSelect.appendChild(option);
-                });
-
-                storages.forEach((storage) => {
-                    const option = document.createElement("option");
-                    option.value = storage;
-                    option.textContent = storage;
-                    storageSelect.appendChild(option);
+                    [...new Set(inventory.map((item) => item[field]))].forEach(
+                        (value) =>
+                            select.insertAdjacentHTML(
+                                "beforeend",
+                                `<option value="${value}">${value}</option>`,
+                            ),
+                    );
                 });
             }
 
@@ -120,27 +113,38 @@
                 const brand = document
                     .getElementById("brand")
                     .value.toLowerCase();
+
+                const model = document
+                    .getElementById("model")
+                    .value.toLowerCase();
+
                 const storage = document.getElementById("storage").value;
+
                 const colors = document
                     .getElementById("color")
                     .value.toLowerCase()
                     .split(",")
                     .map((c) => c.trim())
                     .filter(Boolean);
+
                 const maxPrice = parseFloat(
                     document.getElementById("price").value,
                 );
-                return { brand, storage, colors, maxPrice };
+
+                return { brand, model, storage, colors, maxPrice };
             }
 
             function matchesFilter(
                 phone,
-                { brand, storage, colors, maxPrice },
+                { brand, model, storage, colors, maxPrice },
             ) {
                 const normalize = (str) => str.toLowerCase().trim();
 
                 const matchesBrand =
                     !brand || normalize(phone.brand).includes(normalize(brand));
+
+                const matchesModel =
+                    !model || normalize(phone.model).includes(normalize(model));
 
                 const matchesStorage = !storage || phone.storage === storage;
 
@@ -158,6 +162,7 @@
 
                 return (
                     matchesBrand &&
+                    matchesModel &&
                     matchesStorage &&
                     matchesColor &&
                     matchesPrice
@@ -279,7 +284,7 @@
                     return;
                 }
 
-                populateDropdowns();
+                populateDropdowns(["brand", "model", "storage"]);
                 renderResultsOnce();
                 filterDisplayedRows();
                 document
